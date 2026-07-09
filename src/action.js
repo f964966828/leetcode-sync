@@ -375,6 +375,11 @@ async function sync(inputs) {
           graphql,
           { headers }
         );
+        // DEBUG: Print the complete GraphQL response
+console.log("========== LEETCODE RESPONSE ==========");
+console.log(JSON.stringify(response.data, null, 2));
+console.log("=======================================");
+        
         log(`Successfully fetched submission from LeetCode, offset ${offset}`);
         return response;
       } catch (exception) {
