@@ -14715,6 +14715,29 @@ async function commit(params) {
   return [treeResponse.data.sha, commitResponse.data.sha];
 }
 
+function formatQuestionReadme(question) {
+  const title = question.title || "Unknown";
+  const questionId = question.questionFrontendId;
+  const heading = questionId ? `${questionId}. ${title}` : title;
+  const difficulty = question.difficulty || "Unknown";
+  const topics =
+    (question.topicTags || [])
+      .map((tag) => tag.name)
+      .filter(Boolean)
+      .join(", ") || "None";
+  const content = question.content || "Unable to fetch the Problem statement.";
+
+  return `# ${heading}
+
+**Difficulty:** ${difficulty}
+
+**Topics:** ${topics}
+
+---
+
+${content}`;
+}
+
 async function getQuestionData(titleSlug, leetcodeSession, csrfToken) {
   log(`Getting question data for ${titleSlug}...`);
 
@@ -14722,6 +14745,12 @@ async function getQuestionData(titleSlug, leetcodeSession, csrfToken) {
   const graphql = JSON.stringify({
     query: `query getQuestionDetail($titleSlug: String!) {
       question(titleSlug: $titleSlug) {
+        questionFrontendId
+        title
+        difficulty
+        topicTags {
+          name
+        }
         content
       }
     }`,
@@ -14734,8 +14763,11 @@ async function getQuestionData(titleSlug, leetcodeSession, csrfToken) {
       graphql,
       { headers }
     );
-    const result = await response.data;
-    return result.data.question.content;
+    const question = response.data?.data?.question;
+    if (!question) {
+      return "Unable to fetch the Problem statement.";
+    }
+    return formatQuestionReadme(question);
   } catch (error) {
     // If problem is locked due to user not having LeetCode Premium
     if (error.response && error.response.status === 403) {
@@ -14864,6 +14896,11 @@ async function sync(inputs) {
           graphql,
           { headers }
         );
+        // DEBUG: Print the complete GraphQL response
+console.log("========== LEETCODE RESPONSE ==========");
+console.log(JSON.stringify(response.data, null, 2));
+console.log("=======================================");
+        
         log(`Successfully fetched submission from LeetCode, offset ${offset}`);
         return response;
       } catch (exception) {
