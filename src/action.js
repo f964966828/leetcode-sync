@@ -46,6 +46,47 @@ function pad(n) {
   return s.substring(s.length - 4);
 }
 
+const COMMIT_QID_WIDTH = 4;
+const COMMIT_DIFFICULTY_WIDTH = 6;
+const COMMIT_RUNTIME_WIDTH = 8;
+const COMMIT_MEMORY_WIDTH = 10;
+const COMMIT_PERCENTILE_WIDTH = 7;
+
+function padLeft(value, width) {
+  return String(value ?? "").padStart(width);
+}
+
+function padRight(value, width) {
+  return String(value ?? "").padEnd(width);
+}
+
+function formatCommitMessage(commitName, submission, question) {
+  const title = submission.title || "";
+  const qid = padLeft(
+    submission.qid || question?.questionFrontendId || "N/A",
+    COMMIT_QID_WIDTH,
+  );
+  const difficulty = padRight(
+    question?.difficulty || "N/A",
+    COMMIT_DIFFICULTY_WIDTH,
+  );
+  const runtime = padLeft(submission.runtime || "N/A", COMMIT_RUNTIME_WIDTH);
+  const memory = padLeft(submission.memory || "N/A", COMMIT_MEMORY_WIDTH);
+
+  if ("runtimePerc" in submission) {
+    const runtimePerc = padLeft(
+      submission.runtimePerc || "N/A",
+      COMMIT_PERCENTILE_WIDTH,
+    );
+    const memoryPerc = padLeft(
+      submission.memoryPerc || "N/A",
+      COMMIT_PERCENTILE_WIDTH,
+    );
+    return `${commitName} - ${qid} ${difficulty} - Runtime ${runtime} (${runtimePerc}), Memory ${memory} (${memoryPerc}) - ${title}`;
+  }
+  return `${commitName} - ${qid} ${difficulty} - Runtime ${runtime}, Memory ${memory} - ${title}`;
+}
+
 function normalizeName(problemName) {
   return problemName
     .toLowerCase()
@@ -159,14 +200,8 @@ async function commit(params) {
 
   const prefix = !!destinationFolder ? destinationFolder : "";
   const commitName = !!commitHeader ? commitHeader : COMMIT_MESSAGE;
-
-  if ("runtimePerc" in submission) {
-    message = `${commitName} - ${submission.title} - Runtime - ${submission.runtime} (${submission.runtimePerc}), Memory - ${submission.memory} (${submission.memoryPerc})`;
-    qid = `${submission.qid}-`;
-  } else {
-    message = `${commitName} - ${submission.title} - Runtime - ${submission.runtime}, Memory - ${submission.memory}`;
-    qid = "";
-  }
+  const message = formatCommitMessage(commitName, submission, question);
+  const qid = "runtimePerc" in submission ? `${submission.qid}-` : "";
   const folderName = `${qid}${name}`;
   // Markdown file for the problem with question data
   const questionPath = path.join(prefix, folderName, "README.md");
