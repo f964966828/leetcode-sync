@@ -147,6 +147,7 @@ async function commit(params) {
     destinationFolder,
     commitHeader,
     questionData,
+    question,
   } = params;
 
   const name = normalizeName(submission.title);
@@ -173,6 +174,7 @@ async function commit(params) {
   // Separate file for the solution
   const solutionFileName = `solution.${LANG_TO_EXTENSION[submission.lang]}`;
   const solutionPath = path.join(prefix, folderName, solutionFileName);
+  const statusPath = path.join(prefix, folderName, "status.json");
 
   const treeData = [
     {
@@ -184,6 +186,11 @@ async function commit(params) {
       path: path.normalize(solutionPath),
       mode: "100644",
       content: `${submission.code}\n`, // Adds newline at EOF to conform to git recommendations
+    },
+    {
+      path: path.normalize(statusPath),
+      mode: "100644",
+      content: formatStatusJson(submission, question),
     },
   ];
 
@@ -224,6 +231,34 @@ async function commit(params) {
   log(`Committed solution for ${name}`);
 
   return [treeResponse.data.sha, commitResponse.data.sha];
+}
+
+function formatStatusJson(submission, question) {
+  const topics = (question?.topicTags || [])
+    .map((tag) => tag.name)
+    .filter(Boolean);
+
+  const submittedAt = submission.timestamp
+    ? new Date(Number(submission.timestamp) * 1000).toISOString()
+    : null;
+
+  const status = {
+    id: question?.questionFrontendId || null,
+    title: question?.title || submission.title || null,
+    titleSlug: submission.titleSlug || null,
+    difficulty: question?.difficulty || null,
+    topics,
+    status: submission.statusDisplay || "Accepted",
+    lang: submission.lang || null,
+    runtime: submission.runtime || null,
+    memory: submission.memory || null,
+    runtimePercentile: submission.runtimePerc || null,
+    memoryPercentile: submission.memoryPerc || null,
+    submittedAt,
+    submissionId: submission.id || null,
+  };
+
+  return `${JSON.stringify(status, null, 2)}\n`;
 }
 
 function formatQuestionReadme(question) {
@@ -276,9 +311,15 @@ async function getQuestionData(titleSlug, leetcodeSession, csrfToken) {
     );
     const question = response.data?.data?.question;
     if (!question) {
-      return "Unable to fetch the Problem statement.";
+      return {
+        readme: "Unable to fetch the Problem statement.",
+        question: null,
+      };
     }
-    return formatQuestionReadme(question);
+    return {
+      readme: formatQuestionReadme(question),
+      question,
+    };
   } catch (error) {
     // If problem is locked due to user not having LeetCode Premium
     if (error.response && error.response.status === 403) {
@@ -497,7 +538,8 @@ console.log("=======================================");
       submission,
       destinationFolder,
       commitHeader,
-      questionData,
+      questionData: questionData?.readme,
+      question: questionData?.question,
     });
   }
   log("Done syncing all submissions.");
